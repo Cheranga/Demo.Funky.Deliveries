@@ -1,0 +1,109 @@
+parameters:
+  - name: buildNumber
+    type: string
+
+steps:
+  - task: AzureCLI@2    
+    displayName: "Create resource group"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      scriptType: "pscore"
+      scriptLocation: "inlineScript"
+      inlineScript: |
+        $ifExists = az group exists -n "$(rgName)"
+        if ($ifExists -eq 'false') {
+          echo 'creating the resource group'
+          az group create -n "$(rgName)" -l "$(rgLocation)"
+        }
+
+  - task: AzureCLI@2    
+    displayName: "Provision resources"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      scriptType: "pscore"
+      scriptLocation: "inlineScript"
+      inlineScript: |    
+        az deployment group create `
+        --name $(Build.BuildNumber)-$(funcAppName) `
+        --resource-group "$(rgName)" `
+        --template-file "$(Pipeline.Workspace)/deploy/main.bicep" `
+        --parameters "buildNumber=$(Build.BuildNumber)" `
+        "envType=$(envType)" `
+        "location=$(rgLocation)" `
+        "environmentName=$(environmentName)" `
+        "sgName=$(sgName)" `
+        "smsConfigurationBaseUrl=$(smsConfigurationBaseUrl)" `
+        "smsConfigurationAuthToken=$(smsConfigurationAuthToken)" `
+        "funcAppName=$(funcAppName)"
+
+  - task: AzureCLI@2
+    displayName: "Setting RBAC"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      scriptType: "pscore"
+      scriptLocation: "inlineScript"
+      inlineScript: |                                
+        $funcAppDeployment = "${{parameters.buildNumber}}"+"-function-app"
+        
+        $storageAccountDeployment = "${{parameters.buildNumber}}"+"-storage-account"
+        $storageAccountResourceId=$(az deployment group show -g "$(rgName)" -n "$storageAccountDeployment" --query properties.outputs.subsResourceId.value)        
+        $productionSlotPrincipalId=$(az deployment group show -g "$(rgName)" -n "$funcAppDeployment" --query properties.outputs.productionPrincipalId.value)
+        $stagingSlotPrincipalId=$(az deployment group show -g "$(rgName)" -n "$funcAppDeployment" --query properties.outputs.stagingPrincipalId.value)
+        
+        az role assignment create --role "Storage Blob Data Owner" --assignee $productionSlotPrincipalId --scope $storageAccountResourceId        
+        az role assignment create --role "Storage Blob Data Owner" --assignee $stagingSlotPrincipalId --scope $storageAccountResourceId
+        az role assignment create --role "Storage Queue Data Contributor" --assignee $productionSlotPrincipalId --scope $storageAccountResourceId        
+        az role assignment create --role "Storage Queue Data Contributor" --assignee $stagingSlotPrincipalId --scope $storageAccountResourceId
+
+  - task: AzureAppServiceManage@0
+    displayName: "Stop Azure App Service (Staging)"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      action: "Stop Azure App Service"
+      WebAppName: "func-$(funcAppName)-$(environmentName)"
+      resourceGroupName: "$(rgName)"
+      Slot: "Staging"
+      SpecifySlotOrASE: true
+
+  - task: AzureRmWebAppDeployment@4
+    displayName: "Deploy Azure Function App (Staging)"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      appType: functionApp
+      WebAppName: "func-$(funcAppName)-$(environmentName)"
+      package: "$(Pipeline.Workspace)/funcapp/$(Build.BuildId).zip"
+      enableCustomDeployment: true
+      DeploymentType: zipDeploy
+      JSONFiles: "**/host.json"
+      resourceGroupName: "$(rgName)"
+      deployToSlotOrASE: true
+      SlotName: "Staging"
+
+  - task: AzureAppServiceManage@0
+    displayName: "Start Azure App Service (Staging)"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      action: "Start Azure App Service"
+      WebAppName: "func-$(funcAppName)-$(environmentName)"
+      resourceGroupName: "$(rgName)"
+      Slot: "Staging"
+      SpecifySlotOrASE: true
+
+  - task: AzureAppServiceManage@0
+    displayName: "Swap slots (Staging to Production)"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      action: "Swap Slots"
+      WebAppName: "func-$(funcAppName)-$(environmentName)"
+      resourceGroupName: "$(rgName)"
+      SourceSlot: "staging"
+
+  - task: AzureAppServiceManage@0
+    displayName: "Stop Azure App Service (Staging)"
+    inputs:
+      azureSubscription: "$(azureSubscription)"
+      action: "Stop Azure App Service"
+      WebAppName: "func-$(funcAppName)-$(environmentName)"
+      resourceGroupName: "$(rgName)"
+      Slot: "Staging"
+      SpecifySlotOrASE: true           

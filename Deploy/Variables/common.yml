@@ -1,0 +1,15 @@
+variables:
+  - group: FunkyDeliveries
+  - name: environmentName
+    value: dev
+  - name: rgName
+    value: "rg-$(funcAppName)-$(environmentName)-func"
+  - name: rgLocation
+    value: Australia Southeast  
+  - name: funcAppName
+    value: funkydeliveries    
+  - name: sgName
+    value: "sg$(funcAppName)$(environmentName)"
+  - name: smsConfigurationBaseUrl
+    value: "https://rest.clicksend.com/v3"
+  

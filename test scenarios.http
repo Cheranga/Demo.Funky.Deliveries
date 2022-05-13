@@ -1,0 +1,162 @@
+### Initial setup
+# register a customer in the system
+# @name registercustomer
+POST {{funkyDeliveriesBaseAddress}}/api/customer
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "name": "Jon Snow",
+    "mobile": "{{customerMobile}}",
+    "address": "THE North"
+}
+
+
+### register a picker in the system
+# @name registerpicker1
+POST {{funkyDeliveriesBaseAddress}}/api/picker
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "name": "Daenerys Targaryen",    
+    "mobile": "{{picker1Mobile}}"
+}
+
+### register another picker in the system
+# @name registerpicker2
+POST {{funkyDeliveriesBaseAddress}}/api/picker
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "name": "Little Finger",
+    "mobile": "{{picker2Mobile}}"
+}
+
+### Scenario: customer places an order, and two pickers will be competing to deliver it
+# @name addorder
+POST {{funkyDeliveriesBaseAddress}}/api/orders
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "customerMobile": "{{customerMobile}}",    
+    "price": 100,
+    "shopId": "SHOP-1"
+}
+
+### picker1, requests to deliver it to the customer
+# @name requestopickdelivery1
+POST {{funkyDeliveriesBaseAddress}}/api/delivery/pick
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+  "customerMobile": "{{customerMobile}}",
+  "pickerMobile": "{{picker1Mobile}}",
+  "orderId": "{{addorder.response.body.$.orderId}}"
+}
+
+### picker2, requests to deliver it as well
+# response: the picker will received a message mentioning that this order has already been picked up
+# @name requestopickdelivery2
+POST {{funkyDeliveriesBaseAddress}}/api/delivery/pick
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+  "customerMobile": "{{customerMobile}}",
+  "pickerMobile": "{{picker2Mobile}}",
+  "orderId": "{{addorder.response.body.$.orderId}}"
+}
+
+### picker1, completes the delivery to the customer
+# @name completedelivery1
+POST {{funkyDeliveriesBaseAddress}}/api/delivery/complete
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+  "customerMobile": "{{customerMobile}}",
+  "pickerMobile": "{{picker1Mobile}}",
+  "orderId": "{{addorder.response.body.$.orderId}}"
+}
+
+### Scenario: Picker requests to accept deliveries more than the designated threshold
+# @name addorder_1
+POST {{funkyDeliveriesBaseAddress}}/api/orders
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "customerMobile": "{{customerMobile}}",    
+    "price": 100,
+    "shopId": "SHOP-1"
+}
+
+### @name addorder_2
+POST {{funkyDeliveriesBaseAddress}}/api/orders
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "customerMobile": "{{customerMobile}}",    
+    "price": 100,
+    "shopId": "SHOP-1"
+}
+
+### @name addorder_3
+POST {{funkyDeliveriesBaseAddress}}/api/orders
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "customerMobile": "{{customerMobile}}",    
+    "price": 100,
+    "shopId": "SHOP-1"
+}
+
+### @name addorder_4
+POST {{funkyDeliveriesBaseAddress}}/api/orders
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+    "customerMobile": "{{customerMobile}}",    
+    "price": 100,
+    "shopId": "SHOP-1"
+}
+
+### @name completedelivery_1
+POST {{funkyDeliveriesBaseAddress}}/api/delivery/complete
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+  "customerMobile": "{{customerMobile}}",
+  "pickerMobile": "{{picker2Mobile}}",
+  "orderId": "{{addorder_1.response.body.$.orderId}}"
+}
+
+### @name completedelivery_2
+POST {{funkyDeliveriesBaseAddress}}/api/delivery/complete
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+  "customerMobile": "{{customerMobile}}",
+  "pickerMobile": "{{picker2Mobile}}",
+  "orderId": "{{addorder_2.response.body.$.orderId}}"
+}
+
+### @name completedelivery_3
+POST {{funkyDeliveriesBaseAddress}}/api/delivery/complete
+CorrelationId: {{$guid}}
+x-functions-key: {{funkyDeliveriesAuthKey}}
+
+{
+  "customerMobile": "{{customerMobile}}",
+  "pickerMobile": "{{picker2Mobile}}",
+  "orderId": "{{addorder_3.response.body.$.orderId}}"
+}
